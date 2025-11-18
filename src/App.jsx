@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import ProductCard from "./components/ProductCard";
 import CartRow from "./components/CartRow";
 import PaymentModal from "./components/PaymentModal";
+import ReceiptModal from "./components/ReceiptModal";
 import { money } from "./utils/money";
+import { createOrder } from "./apis/orderApi";
 import "./App.css";
 
 export default function App() {
@@ -14,19 +16,21 @@ export default function App() {
     applyMembership: false,
     takeFreeGift: false,
   });
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [receipt, setReceipt] = useState(null);
 
   useEffect(() => {
     (async () => {
       setIsLoadingProducts(true);
       try {
-        const response = await fetch("/api/products");
-        const responseJson = await response.json();
-        const list = Array.isArray(responseJson.result)
-          ? responseJson.result
-          : responseJson.result?.data ?? [];
+        const res = await fetch("/api/products");
+        const json = await res.json();
+        const list = Array.isArray(json.result)
+          ? json.result
+          : json.result?.data ?? [];
         setProductList(list);
-      } catch (error) {
-        console.error(error);
+      } catch (e) {
+        console.error(e);
         alert("상품을 불러오지 못했습니다.");
       } finally {
         setIsLoadingProducts(false);
@@ -35,83 +39,69 @@ export default function App() {
   }, []);
 
   const addToCart = (productToAdd) => {
-    setCartItemsById((previousCartState) => {
-      const updatedCartState = { ...previousCartState };
-
-      const existingCartItem = updatedCartState[productToAdd.productId] || {
+    setCartItemsById((prev) => {
+      const next = { ...prev };
+      const existing = next[productToAdd.productId] || {
         productId: productToAdd.productId,
         name: productToAdd.name,
         price: productToAdd.price,
         quantity: 0,
       };
-
-      const quantityAlreadyInCart =
-        Object.values(previousCartState).find(
-          (item) => item.productId === productToAdd.productId
-        )?.quantity ?? 0;
-
-      const productFromList = productList.find(
+      const already =
+        Object.values(prev).find((i) => i.productId === productToAdd.productId)
+          ?.quantity ?? 0;
+      const product = productList.find(
         (p) => p.productId === productToAdd.productId
       );
-      const remainingStock =
-        (productFromList?.stock ?? 0) - quantityAlreadyInCart;
-      if (remainingStock <= 0) return previousCartState;
-
-      existingCartItem.quantity += 1;
-      updatedCartState[productToAdd.productId] = existingCartItem;
-      return updatedCartState;
+      const remain = (product?.stock ?? 0) - already;
+      if (remain <= 0) return prev;
+      existing.quantity += 1;
+      next[productToAdd.productId] = existing;
+      return next;
     });
   };
 
   const increaseCartItemQuantity = (productId) =>
-    setCartItemsById((previousCartState) => {
-      const updatedCartState = { ...previousCartState };
-      const cartItem = updatedCartState[productId];
-      if (!cartItem) return previousCartState;
-
-      const productFromList = productList.find(
-        (p) => p.productId === productId
-      );
-      const remainingStock = (productFromList?.stock ?? 0) - cartItem.quantity;
-      if (remainingStock <= 0) return previousCartState;
-
-      cartItem.quantity += 1;
-      return updatedCartState;
+    setCartItemsById((prev) => {
+      const next = { ...prev };
+      const row = next[productId];
+      if (!row) return prev;
+      const product = productList.find((p) => p.productId === productId);
+      const remain = (product?.stock ?? 0) - row.quantity;
+      if (remain <= 0) return prev;
+      row.quantity += 1;
+      return next;
     });
 
   const decreaseCartItemQuantity = (productId) =>
-    setCartItemsById((previousCartState) => {
-      const updatedCartState = { ...previousCartState };
-      const cartItem = updatedCartState[productId];
-      if (!cartItem) return previousCartState;
-
-      cartItem.quantity -= 1;
-      if (cartItem.quantity <= 0) delete updatedCartState[productId];
-      return updatedCartState;
+    setCartItemsById((prev) => {
+      const next = { ...prev };
+      const row = next[productId];
+      if (!row) return prev;
+      row.quantity -= 1;
+      if (row.quantity <= 0) delete next[productId];
+      return next;
     });
 
   const removeCartItem = (productId) =>
-    setCartItemsById((previousCartState) => {
-      const updatedCartState = { ...previousCartState };
-      delete updatedCartState[productId];
-      return updatedCartState;
+    setCartItemsById((prev) => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
     });
 
   const cartItems = useMemo(
     () => Object.values(cartItemsById),
     [cartItemsById]
   );
-
   const totalQuantity = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    () => cartItems.reduce((sum, i) => sum + i.quantity, 0),
     [cartItems]
   );
-
   const subtotalAmount = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    () => cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0),
     [cartItems]
   );
-
   const paymentSummary = useMemo(
     () => ({ totalQuantity, subtotalText: money(subtotalAmount) }),
     [totalQuantity, subtotalAmount]
@@ -119,25 +109,24 @@ export default function App() {
 
   const productsByName = useMemo(() => {
     const map = new Map();
-    for (const product of productList) {
-      const arr = map.get(product.name) ?? [];
-      arr.push(product);
-      map.set(product.name, arr);
+    for (const p of productList) {
+      const arr = map.get(p.name) ?? [];
+      arr.push(p);
+      map.set(p.name, arr);
     }
     return map;
   }, [productList]);
 
   const getQtyInCart = (productId) => cartItemsById[productId]?.quantity ?? 0;
-
   const getRemainingStock = (product) =>
     (product.stock ?? 0) - getQtyInCart(product.productId);
 
   const isNormalLocked = (product) => {
     if (product.promotionSearchResponse) return false;
     const siblings = productsByName.get(product.name) ?? [];
-    const promoVariant = siblings.find((p) => !!p.promotionSearchResponse);
-    if (!promoVariant) return false;
-    return getRemainingStock(promoVariant) > 0;
+    const promo = siblings.find((p) => !!p.promotionSearchResponse);
+    if (!promo) return false;
+    return getRemainingStock(promo) > 0;
   };
 
   const productById = useMemo(
@@ -148,8 +137,8 @@ export default function App() {
   const hasPromotionItemInCart = useMemo(
     () =>
       cartItems.some((item) => {
-        const product = productById.get(item.productId);
-        return !!product?.promotionSearchResponse;
+        const p = productById.get(item.productId);
+        return !!p?.promotionSearchResponse;
       }),
     [cartItems, productById]
   );
@@ -162,22 +151,32 @@ export default function App() {
 
   const handleConfirmPayment = async () => {
     try {
-      const payload = {
-        items: cartItems.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        })),
+      const orderItems = cartItems.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      }));
+
+      const purchasedLines = cartItems.map((item) => ({
+        name: item.name,
+        qty: item.quantity,
+        unit: item.price,
+        amount: item.price * item.quantity,
+      }));
+
+      const res = await createOrder({
+        orderItems,
         applyMembership: paymentOptions.applyMembership,
         takePromotionFreeGift: paymentOptions.takeFreeGift,
-      };
+      });
+      const result = res?.result ?? res;
 
-      console.log("결제요청:", payload);
-      alert("결제가 완료되었습니다.");
-      setCartItemsById({});
       setIsPaymentModalOpen(false);
+      setReceipt({ lines: purchasedLines, summary: result });
+      setIsReceiptOpen(true);
+      setCartItemsById({});
     } catch (error) {
       console.error(error);
-      alert("결제에 실패했습니다.");
+      alert(error.message || "결제에 실패했습니다.");
     }
   };
 
@@ -195,10 +194,8 @@ export default function App() {
             {productList.map((product) => {
               const quantityInCart =
                 cartItemsById[product.productId]?.quantity ?? 0;
-
               const selfSoldOut = getRemainingStock(product) <= 0;
               const normalLocked = isNormalLocked(product);
-
               return (
                 <ProductCard
                   key={product.productId}
@@ -256,6 +253,12 @@ export default function App() {
         setOptions={setPaymentOptions}
         summary={paymentSummary}
         promotionAvailable={hasPromotionItemInCart}
+      />
+
+      <ReceiptModal
+        open={isReceiptOpen}
+        onClose={() => setIsReceiptOpen(false)}
+        receipt={receipt}
       />
     </div>
   );
