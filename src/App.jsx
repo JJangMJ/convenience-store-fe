@@ -4,6 +4,7 @@ import "./App.css";
 export default function App() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productList, setProductList] = useState([]);
+  const [cartItemsById, setCartItemsById] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -24,6 +25,35 @@ export default function App() {
     })();
   }, []);
 
+  const addToCart = (productToAdd) => {
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
+
+      const existingCartItem = updatedCartState[productToAdd.productId] || {
+        productId: productToAdd.productId,
+        name: productToAdd.name,
+        price: productToAdd.price,
+        quantity: 0,
+      };
+
+      const quantityAlreadyInCart =
+        Object.values(previousCartState).find(
+          (item) => item.productId === productToAdd.productId
+        )?.quantity ?? 0;
+
+      const productFromList = productList.find(
+        (p) => p.productId === productToAdd.productId
+      );
+      const remainingStock =
+        (productFromList?.stock ?? 0) - quantityAlreadyInCart;
+      if (remainingStock <= 0) return previousCartState;
+
+      existingCartItem.quantity += 1;
+      updatedCartState[productToAdd.productId] = existingCartItem;
+      return updatedCartState;
+    });
+  };
+
   return (
     <div className="page">
       <header className="page__header">
@@ -34,7 +64,20 @@ export default function App() {
         <section className="panel">
           <h3 className="panel__title">상품</h3>
           {isLoadingProducts && <div className="empty">로딩 중…</div>}
-          <div className="grid"></div>
+          <div className="grid">
+            {productList.map((product) => {
+              const quantityInCart =
+                cartItemsById[product.productId]?.quantity ?? 0;
+              return (
+                <ProductCard
+                  key={product.productId}
+                  product={product}
+                  cartQty={quantityInCart}
+                  onAdd={addToCart}
+                />
+              );
+            })}
+          </div>
         </section>
 
         <aside className="panel cart">
