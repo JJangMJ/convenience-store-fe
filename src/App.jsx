@@ -5,6 +5,7 @@ import PaymentModal from "./components/PaymentModal";
 import { money } from "./utils/money";
 import "./App.css";
 import { createOrder } from "./apis/orderApi";
+import { getProducts } from "./apis/productApi";
 
 export default function App() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -17,22 +18,24 @@ export default function App() {
   });
 
   useEffect(() => {
+    const controller = new AbortController();
+
     (async () => {
       setIsLoadingProducts(true);
       try {
-        const response = await fetch("/api/products");
-        const responseJson = await response.json();
-        const list = Array.isArray(responseJson.result)
-          ? responseJson.result
-          : responseJson.result?.data ?? [];
+        const list = await getProducts(controller.signal);
         setProductList(list);
       } catch (error) {
-        console.error(error);
-        alert("상품을 불러오지 못했습니다.");
+        if (error.name !== "AbortError") {
+          console.error(error);
+          alert("상품을 불러오지 못했습니다.");
+        }
       } finally {
         setIsLoadingProducts(false);
       }
     })();
+
+    return () => controller.abort();
   }, []);
 
   const addToCart = (productToAdd) => {
@@ -134,7 +137,7 @@ export default function App() {
     (product.stock ?? 0) - getQtyInCart(product.productId);
 
   const isNormalLocked = (product) => {
-    if (product.promotionSearchResponse) return false; // 본인이 프로모션이면 잠금 아님
+    if (product.promotionSearchResponse) return false;
     const siblings = productsByName.get(product.name) ?? [];
     const promoVariant = siblings.find((p) => !!p.promotionSearchResponse);
     if (!promoVariant) return false;
