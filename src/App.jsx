@@ -1,35 +1,31 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <div className="page">
+      <header className="page__header">
+        <div className="brand">W 편의점</div>
+      </header>
 
-export default App
+      <main className="layout">
+        <section className="panel">
+          <h3 className="panel__title">상품</h3>
+          {isLoadingProducts && <div className="empty">로딩 중…</div>}
+          <div className="grid"></div>
+        </section>
+
+        <aside className="panel cart">
+          <h3 className="panel__title">장바구니</h3>
+          <div className="cart__rows"></div>
+          <div className="cart__summary"></div>
+          <button className="btn btn-fill cart__pay" disabled>
+            결제하기
+          </button>
+        </aside>
+      </main>
+    </div>
+  );
+}
