@@ -4,28 +4,26 @@ import CartRow from "./components/CartRow";
 import PaymentModal from "./components/PaymentModal";
 import { money } from "./utils/money";
 import "./App.css";
-import { createOrder, previewOrder } from "./apis/orderApi";
-import { getProducts } from "./apis/productApi";
 
 export default function App() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productList, setProductList] = useState([]);
   const [cartItemsById, setCartItemsById] = useState({});
-
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentOptions, setPaymentOptions] = useState({
     applyMembership: false,
     takeFreeGift: false,
   });
 
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
-  const [orderPreview, setOrderPreview] = useState(null);
-
   useEffect(() => {
     (async () => {
       setIsLoadingProducts(true);
       try {
-        const list = await getProducts();
+        const response = await fetch("/api/products");
+        const responseJson = await response.json();
+        const list = Array.isArray(responseJson.result)
+          ? responseJson.result
+          : responseJson.result?.data ?? [];
         setProductList(list);
       } catch (error) {
         console.error(error);
@@ -37,77 +35,83 @@ export default function App() {
   }, []);
 
   const addToCart = (productToAdd) => {
-    setCartItemsById((previous) => {
-      const next = { ...previous };
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
 
-      const existing = next[productToAdd.productId] || {
+      const existingCartItem = updatedCartState[productToAdd.productId] || {
         productId: productToAdd.productId,
         name: productToAdd.name,
         price: productToAdd.price,
         quantity: 0,
       };
 
-      const alreadyQty =
-        Object.values(previous).find(
-          (i) => i.productId === productToAdd.productId
+      const quantityAlreadyInCart =
+        Object.values(previousCartState).find(
+          (item) => item.productId === productToAdd.productId
         )?.quantity ?? 0;
 
-      const product = productList.find(
+      const productFromList = productList.find(
         (p) => p.productId === productToAdd.productId
       );
-      const remain = (product?.stock ?? 0) - alreadyQty;
-      if (remain <= 0) return previous;
+      const remainingStock =
+        (productFromList?.stock ?? 0) - quantityAlreadyInCart;
+      if (remainingStock <= 0) return previousCartState;
 
-      existing.quantity += 1;
-      next[productToAdd.productId] = existing;
-      return next;
+      existingCartItem.quantity += 1;
+      updatedCartState[productToAdd.productId] = existingCartItem;
+      return updatedCartState;
     });
   };
 
   const increaseCartItemQuantity = (productId) =>
-    setCartItemsById((previous) => {
-      const next = { ...previous };
-      const row = next[productId];
-      if (!row) return previous;
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
+      const cartItem = updatedCartState[productId];
+      if (!cartItem) return previousCartState;
 
-      const product = productList.find((p) => p.productId === productId);
-      const remain = (product?.stock ?? 0) - row.quantity;
-      if (remain <= 0) return previous;
+      const productFromList = productList.find(
+        (p) => p.productId === productId
+      );
+      const remainingStock = (productFromList?.stock ?? 0) - cartItem.quantity;
+      if (remainingStock <= 0) return previousCartState;
 
-      row.quantity += 1;
-      return next;
+      cartItem.quantity += 1;
+      return updatedCartState;
     });
 
   const decreaseCartItemQuantity = (productId) =>
-    setCartItemsById((previous) => {
-      const next = { ...previous };
-      const row = next[productId];
-      if (!row) return previous;
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
+      const cartItem = updatedCartState[productId];
+      if (!cartItem) return previousCartState;
 
-      row.quantity -= 1;
-      if (row.quantity <= 0) delete next[productId];
-      return next;
+      cartItem.quantity -= 1;
+      if (cartItem.quantity <= 0) delete updatedCartState[productId];
+      return updatedCartState;
     });
 
   const removeCartItem = (productId) =>
-    setCartItemsById((previous) => {
-      const next = { ...previous };
-      delete next[productId];
-      return next;
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
+      delete updatedCartState[productId];
+      return updatedCartState;
     });
 
   const cartItems = useMemo(
     () => Object.values(cartItemsById),
     [cartItemsById]
   );
+
   const totalQuantity = useMemo(
-    () => cartItems.reduce((sum, i) => sum + i.quantity, 0),
+    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
     [cartItems]
   );
+
   const subtotalAmount = useMemo(
-    () => cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0),
+    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [cartItems]
   );
+
   const paymentSummary = useMemo(
     () => ({ totalQuantity, subtotalText: money(subtotalAmount) }),
     [totalQuantity, subtotalAmount]
@@ -124,6 +128,7 @@ export default function App() {
   }, [productList]);
 
   const getQtyInCart = (productId) => cartItemsById[productId]?.quantity ?? 0;
+
   const getRemainingStock = (product) =>
     (product.stock ?? 0) - getQtyInCart(product.productId);
 
@@ -155,39 +160,6 @@ export default function App() {
     }
   }, [hasPromotionItemInCart, paymentOptions.takeFreeGift]);
 
-  const buildPreviewRequest = () => {
-    return {
-      applyMembership: paymentOptions.applyMembership,
-      items: cartItems.map((item) => {
-        const p = productById.get(item.productId);
-        return {
-          productId: item.productId,
-          productName: p?.name ?? "",
-          quantity: item.quantity,
-          promotionName: p?.promotionSearchResponse?.name ?? null,
-        };
-      }),
-    };
-  };
-
-  const openPaymentWithPreview = async () => {
-    if (cartItems.length === 0) return;
-    setIsPaymentModalOpen(true);
-    setIsPreviewLoading(true);
-    setOrderPreview(null);
-    try {
-      const previewReq = buildPreviewRequest();
-      const preview = await previewOrder(previewReq);
-      setOrderPreview(preview);
-    } catch (error) {
-      console.error(error);
-      alert(error.message || "결제 미리보기 실패");
-      setIsPaymentModalOpen(false);
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
-
   const handleConfirmPayment = async () => {
     try {
       const payload = {
@@ -198,8 +170,9 @@ export default function App() {
         applyMembership: paymentOptions.applyMembership,
         takePromotionFreeGift: paymentOptions.takeFreeGift,
       };
-      const json = await createOrder(payload);
-      alert(json?.message || "결제가 완료되었습니다.");
+
+      console.log("결제요청:", payload);
+      alert("결제가 완료되었습니다.");
       setCartItemsById({});
       setIsPaymentModalOpen(false);
     } catch (error) {
@@ -268,7 +241,7 @@ export default function App() {
           <button
             className="btn btn-fill cart__pay"
             disabled={cartItems.length === 0}
-            onClick={openPaymentWithPreview}
+            onClick={() => setIsPaymentModalOpen(true)}
           >
             결제하기
           </button>
@@ -283,8 +256,6 @@ export default function App() {
         setOptions={setPaymentOptions}
         summary={paymentSummary}
         promotionAvailable={hasPromotionItemInCart}
-        preview={orderPreview}
-        previewLoading={isPreviewLoading}
       />
     </div>
   );
