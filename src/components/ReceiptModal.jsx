@@ -3,31 +3,39 @@ import { money } from "../utils/money";
 export default function ReceiptModal({ open, onClose, receipt }) {
   if (!open || !receipt) return null;
 
-  const lines = receipt.lines || [];
-  const s = receipt.summary || {};
-
-  const row = (name, qty, amount) => {
-    const n = String(name ?? "")
+  const lineItems = receipt.lines ?? [];
+  const summary = receipt.summary ?? {};
+  const formatReceiptRow = (productName, quantity, amount) => {
+    const nameCell = String(productName ?? "")
       .slice(0, 12)
       .padEnd(12, " ");
-    const q = String(qty ?? 0).padStart(2, " ");
-    const a = money(amount ?? 0).padStart(10, " ");
-    return `${n}  ${q}   ${a}`;
+    const quantityCell = String(quantity ?? 0).padStart(2, " ");
+    const amountCell = money(amount ?? 0).padStart(10, " ");
+    return `${nameCell}  ${quantityCell}   ${amountCell}`;
   };
 
-  const totalQty = lines.reduce((acc, l) => acc + (l.qty || 0), 0);
+  const totalQuantity = lineItems.reduce(
+    (acc, item) => acc + (item.qty || 0),
+    0
+  );
 
-  const body = [
-    "===========W 편의점===========",
+  const receiptText = [
+    "===========W 편의점=============",
     "상품명          수량      금액",
-    ...lines.map((l) => row(l.name, l.qty, l.amount)),
+    ...lineItems.map((item) =>
+      formatReceiptRow(item.name, item.qty, item.amount)
+    ),
     "==============================",
-    `총구매액        ${String(totalQty).padStart(2, " ")}   ${money(
-      s.originalTotalAmount || 0
+    `총구매액        ${String(totalQuantity).padStart(2, " ")}   ${money(
+      summary.originalTotalAmount || 0
     ).padStart(10, " ")}`,
-    `행사할인                     -${money(s.promotionDiscountAmount || 0)}`,
-    `멤버십할인                   -${money(s.membershipDiscountAmount || 0)}`,
-    `결제금액                      ${money(s.finalTotalAmount || 0)}`,
+    `행사할인                     -${money(
+      summary.promotionDiscountAmount || 0
+    )}`,
+    `멤버십할인                   -${money(
+      summary.membershipDiscountAmount || 0
+    )}`,
+    `결제금액                      ${money(summary.finalTotalAmount || 0)}`,
   ].join("\n");
 
   return (
@@ -44,7 +52,7 @@ export default function ReceiptModal({ open, onClose, receipt }) {
               lineHeight: 1.5,
             }}
           >
-            {body}
+            {receiptText}
           </pre>
         </div>
         <div className="modal__footer">
