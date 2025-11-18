@@ -10,6 +10,10 @@ export default function App() {
   const [productList, setProductList] = useState([]);
   const [cartItemsById, setCartItemsById] = useState({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentOptions, setPaymentOptions] = useState({
+    applyMembership: false,
+    takeFreeGift: false,
+  });
 
   useEffect(() => {
     (async () => {
@@ -113,6 +117,26 @@ export default function App() {
     [totalQuantity, subtotalAmount]
   );
 
+  const handleConfirmPayment = async () => {
+    try {
+      const payload = {
+        items: cartItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+        applyMembership: paymentOptions.applyMembership,
+        takePromotionFreeGift: paymentOptions.takeFreeGift,
+      };
+      console.log("결제요청:", payload);
+      alert("결제가 완료되었습니다.");
+      setCartItemsById({});
+      setIsPaymentModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      alert("결제에 실패했습니다.");
+    }
+  };
+
   return (
     <div className="page">
       <header className="page__header">
@@ -167,6 +191,14 @@ export default function App() {
           </button>
         </aside>
       </main>
+      <PaymentModal
+        open={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onConfirm={handleConfirmPayment}
+        options={paymentOptions}
+        setOptions={setPaymentOptions}
+        summary={paymentSummary}
+      />
     </div>
   );
 }
