@@ -3,6 +3,26 @@ import "./App.css";
 
 export default function App() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [productList, setProductList] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      setIsLoadingProducts(true);
+      try {
+        const response = await fetch("/api/products");
+        const responseJson = await response.json();
+        const list = Array.isArray(responseJson.result)
+          ? responseJson.result
+          : responseJson.result?.data ?? [];
+        setProductList(list);
+      } catch (error) {
+        console.error(error);
+        alert("상품을 불러오지 못했습니다.");
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    })();
+  }, []);
 
   return (
     <div className="page">
