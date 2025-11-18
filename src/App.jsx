@@ -4,6 +4,7 @@ import CartRow from "./components/CartRow";
 import PaymentModal from "./components/PaymentModal";
 import { money } from "./utils/money";
 import "./App.css";
+import { createOrder } from "./apis/orderApi";
 
 export default function App() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -170,7 +171,9 @@ export default function App() {
         applyMembership: paymentOptions.applyMembership,
         takePromotionFreeGift: paymentOptions.takeFreeGift,
       };
-      console.log("결제요청:", payload);
+      const json = await createOrder(payload);
+      const message = json?.message || "결제가 완료되었습니다.";
+
       alert("결제가 완료되었습니다.");
       setCartItemsById({});
       setIsPaymentModalOpen(false);
