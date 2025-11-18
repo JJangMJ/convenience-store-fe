@@ -1,42 +1,209 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --text: #dfe6ee;
+  --muted: #97a3b6;
+  --primary: #8de1d1;
+  --danger: #ef5350;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+.page__header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #222733;
+}
+.brand {
+  font-weight: 700;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 20px;
+  width: 1200px;
+  max-width: calc(100% - 40px);
+  margin: 20px auto;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 16px;
+}
+.panel__title {
+  margin: 0 0 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.product-card {
+  background: #1d212b;
+  border: 1px solid #2a2f3b;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.product-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.product-card__title {
+  font-weight: 600;
+}
+.product-card__price {
+  color: var(--text);
+}
+.product-card__stock {
+  color: var(--muted);
+  font-size: 12px;
+}
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: #24313a;
+  color: var(--primary);
+  border: 1px solid #305e5a;
+}
+
+.btn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #2a2f3b;
+  background: #1c212b;
+  color: var(--text);
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: #2a2f3b;
+}
+.btn-fill {
+  background: var(--primary);
+  color: #0c1514;
+  border: none;
+}
+.btn-danger {
+  background: var(--danger);
+  border: none;
+  color: white;
+}
+
+.cart {
+  position: sticky;
+  top: 20px;
+  height: fit-content;
+  align-self: start;
+}
+.cart__rows {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cart-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  background: #1d212b;
+  border: 1px solid #2a2f3b;
+  border-radius: 8px;
+  padding: 8px;
+}
+.cart-row__name {
+  font-weight: 600;
+}
+.cart-row__qty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cart-row__qty-num {
+  width: 28px;
+  text-align: center;
+}
+.cart-row__price {
+  width: 90px;
+  text-align: right;
+}
+.cart__summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #2a2f3b;
+  margin-top: 10px;
+}
+.cart__pay {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.empty {
+  color: var(--muted);
+  padding: 12px;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+.modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 100;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+.modal {
+  width: 420px;
+  max-width: calc(100% - 32px);
+  background: var(--panel);
+  border: 1px solid #2a2f3b;
+  border-radius: 12px;
 }
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.modal__header,
+.modal__footer {
+  padding: 14px 16px;
+  border-bottom: 1px solid #2a2f3b;
 }
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.modal__footer {
+  border-top: 1px solid #2a2f3b;
+  border-bottom: none;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.modal__body {
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
 }
-
-.card {
-  padding: 2em;
+.switch-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
-
-.read-the-docs {
-  color: #888;
+.modal__summary {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px dashed #2a2f3b;
+  border-radius: 8px;
 }
