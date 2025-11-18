@@ -9,6 +9,7 @@ export default function App() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productList, setProductList] = useState([]);
   const [cartItemsById, setCartItemsById] = useState({});
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -97,6 +98,21 @@ export default function App() {
     [cartItemsById]
   );
 
+  const totalQuantity = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    [cartItems]
+  );
+
+  const subtotalAmount = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cartItems]
+  );
+
+  const paymentSummary = useMemo(
+    () => ({ totalQuantity, subtotalText: money(subtotalAmount) }),
+    [totalQuantity, subtotalAmount]
+  );
+
   return (
     <div className="page">
       <header className="page__header">
@@ -136,8 +152,17 @@ export default function App() {
               />
             ))}
           </div>
-          <div className="cart__summary"></div>
-          <button className="btn btn-fill cart__pay" disabled>
+          <div className="cart__summary">
+            <div>총 수량</div>
+            <div>{totalQuantity}</div>
+            <div>상품 금액</div>
+            <div>{money(subtotalAmount)}</div>
+          </div>
+          <button
+            className="btn btn-fill cart__pay"
+            disabled={cartItems.length === 0}
+            onClick={() => setIsPaymentModalOpen(true)}
+          >
             결제하기
           </button>
         </aside>
