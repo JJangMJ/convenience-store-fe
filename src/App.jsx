@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import ProductCard from "./components/ProductCard";
+import CartRow from "./components/CartRow";
+import PaymentModal from "./components/PaymentModal";
+import { money } from "./utils/money";
 import "./App.css";
 
 export default function App() {
@@ -54,6 +58,45 @@ export default function App() {
     });
   };
 
+  const increaseCartItemQuantity = (productId) =>
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
+      const cartItem = updatedCartState[productId];
+      if (!cartItem) return previousCartState;
+
+      const productFromList = productList.find(
+        (p) => p.productId === productId
+      );
+      const remainingStock = (productFromList?.stock ?? 0) - cartItem.quantity;
+      if (remainingStock <= 0) return previousCartState;
+
+      cartItem.quantity += 1;
+      return updatedCartState;
+    });
+
+  const decreaseCartItemQuantity = (productId) =>
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
+      const cartItem = updatedCartState[productId];
+      if (!cartItem) return previousCartState;
+
+      cartItem.quantity -= 1;
+      if (cartItem.quantity <= 0) delete updatedCartState[productId];
+      return updatedCartState;
+    });
+
+  const removeCartItem = (productId) =>
+    setCartItemsById((previousCartState) => {
+      const updatedCartState = { ...previousCartState };
+      delete updatedCartState[productId];
+      return updatedCartState;
+    });
+
+  const cartItems = useMemo(
+    () => Object.values(cartItemsById),
+    [cartItemsById]
+  );
+
   return (
     <div className="page">
       <header className="page__header">
@@ -82,7 +125,17 @@ export default function App() {
 
         <aside className="panel cart">
           <h3 className="panel__title">장바구니</h3>
-          <div className="cart__rows"></div>
+          <div className="cart__rows">
+            {cartItems.map((item) => (
+              <CartRow
+                key={item.productId}
+                item={item}
+                onInc={increaseCartItemQuantity}
+                onDec={decreaseCartItemQuantity}
+                onRemove={removeCartItem}
+              />
+            ))}
+          </div>
           <div className="cart__summary"></div>
           <button className="btn btn-fill cart__pay" disabled>
             결제하기
