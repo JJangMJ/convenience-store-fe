@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { money } from "../utils/money";
 
 export default function PaymentModal({
   open,
@@ -8,6 +9,8 @@ export default function PaymentModal({
   setOptions,
   summary,
   promotionAvailable,
+  preview,
+  previewLoading,
 }) {
   useEffect(() => {
     if (!open) return;
@@ -23,6 +26,8 @@ export default function PaymentModal({
   }, [promotionAvailable, options.takeFreeGift, setOptions]);
 
   if (!open) return null;
+
+  const previewSummary = preview?.summary;
 
   return (
     <div className="modal__backdrop" onClick={onClose}>
@@ -68,7 +73,32 @@ export default function PaymentModal({
             <span>프로모션 무료 증정 받기</span>
           </label>
 
-          {summary && (
+          {previewLoading && <div className="modal__summary">계산 중…</div>}
+
+          {!previewLoading && previewSummary && (
+            <div className="modal__summary">
+              <div>
+                총 수량: <b>{previewSummary.totalQuantity}</b>
+              </div>
+              <div>
+                총구매액:{" "}
+                <b>{money(previewSummary.originalTotalAmount ?? 0)}</b>
+              </div>
+              <div>
+                행사할인:{" "}
+                <b>-{money(previewSummary.promotionDiscountAmount ?? 0)}</b>
+              </div>
+              <div>
+                멤버십할인:{" "}
+                <b>-{money(previewSummary.membershipDiscountAmount ?? 0)}</b>
+              </div>
+              <div>
+                결제금액: <b>{money(previewSummary.finalTotalAmount ?? 0)}</b>
+              </div>
+            </div>
+          )}
+
+          {!previewLoading && !previewSummary && summary && (
             <div className="modal__summary">
               <div>
                 총 수량: <b>{summary.totalQuantity}</b>
@@ -84,7 +114,11 @@ export default function PaymentModal({
           <button className="btn btn-ghost" onClick={onClose}>
             취소
           </button>
-          <button className="btn btn-fill" onClick={onConfirm}>
+          <button
+            className="btn btn-fill"
+            onClick={onConfirm}
+            disabled={previewLoading}
+          >
             결제하기
           </button>
         </div>
