@@ -1,9 +1,14 @@
 import { money } from "../utils/money";
 
-export default function ProductCard({ product, cartQty = 0, onAdd }) {
+export default function ProductCard({
+  product,
+  cartQty = 0,
+  onAdd,
+  disabled = false,
+  disabledReason = "",
+}) {
   const promo = product.promotionSearchResponse;
   const stockLeft = Math.max(0, product.stock - cartQty);
-  const isSoldOut = stockLeft <= 0 || product.isSoldOut;
 
   return (
     <div className="product-card">
@@ -13,13 +18,13 @@ export default function ProductCard({ product, cartQty = 0, onAdd }) {
       </div>
 
       <div className="product-card__price">{money(product.price)}</div>
-
       <div className="product-card__stock">재고: {stockLeft}</div>
 
       <button
         className="btn btn-fill"
-        disabled={isSoldOut}
+        disabled={disabled}
         onClick={() => onAdd(product)}
+        title={disabled ? disabledReason : undefined}
       >
         담기
       </button>

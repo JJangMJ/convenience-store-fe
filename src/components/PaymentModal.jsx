@@ -7,6 +7,7 @@ export default function PaymentModal({
   options,
   setOptions,
   summary,
+  promotionAvailable,
 }) {
   useEffect(() => {
     if (!open) return;
@@ -14,6 +15,12 @@ export default function PaymentModal({
     document.body.style.overflow = "hidden";
     return () => (document.body.style.overflow = prev);
   }, [open]);
+
+  useEffect(() => {
+    if (!promotionAvailable && options.takeFreeGift) {
+      setOptions((prev) => ({ ...prev, takeFreeGift: false }));
+    }
+  }, [promotionAvailable, options.takeFreeGift, setOptions]);
 
   if (!open) return null;
 
@@ -39,9 +46,17 @@ export default function PaymentModal({
             <span>멤버십 할인 적용</span>
           </label>
 
-          <label className="switch-row">
+          <label
+            className="switch-row"
+            title={
+              !promotionAvailable
+                ? "장바구니에 프로모션 상품이 있을 때만 사용 가능합니다."
+                : undefined
+            }
+          >
             <input
               type="checkbox"
+              disabled={!promotionAvailable}
               checked={options.takeFreeGift}
               onChange={(e) =>
                 setOptions((prev) => ({
@@ -56,7 +71,7 @@ export default function PaymentModal({
           {summary && (
             <div className="modal__summary">
               <div>
-                총 수량: <b>{summary.totalQty}</b>
+                총 수량: <b>{summary.totalQuantity}</b>
               </div>
               <div>
                 상품 금액: <b>{summary.subtotalText}</b>

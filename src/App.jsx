@@ -117,6 +117,49 @@ export default function App() {
     [totalQuantity, subtotalAmount]
   );
 
+  const productsByName = useMemo(() => {
+    const map = new Map();
+    for (const product of productList) {
+      const arr = map.get(product.name) ?? [];
+      arr.push(product);
+      map.set(product.name, arr);
+    }
+    return map;
+  }, [productList]);
+
+  const getQtyInCart = (productId) => cartItemsById[productId]?.quantity ?? 0;
+
+  const getRemainingStock = (product) =>
+    (product.stock ?? 0) - getQtyInCart(product.productId);
+
+  const isNormalLocked = (product) => {
+    if (product.promotionSearchResponse) return false; // 본인이 프로모션이면 잠금 아님
+    const siblings = productsByName.get(product.name) ?? [];
+    const promoVariant = siblings.find((p) => !!p.promotionSearchResponse);
+    if (!promoVariant) return false;
+    return getRemainingStock(promoVariant) > 0;
+  };
+
+  const productById = useMemo(
+    () => new Map(productList.map((p) => [p.productId, p])),
+    [productList]
+  );
+
+  const hasPromotionItemInCart = useMemo(
+    () =>
+      cartItems.some((item) => {
+        const product = productById.get(item.productId);
+        return !!product?.promotionSearchResponse;
+      }),
+    [cartItems, productById]
+  );
+
+  useEffect(() => {
+    if (!hasPromotionItemInCart && paymentOptions.takeFreeGift) {
+      setPaymentOptions((prev) => ({ ...prev, takeFreeGift: false }));
+    }
+  }, [hasPromotionItemInCart, paymentOptions.takeFreeGift]);
+
   const handleConfirmPayment = async () => {
     try {
       const payload = {
@@ -151,12 +194,24 @@ export default function App() {
             {productList.map((product) => {
               const quantityInCart =
                 cartItemsById[product.productId]?.quantity ?? 0;
+
+              const selfSoldOut = getRemainingStock(product) <= 0;
+              const normalLocked = isNormalLocked(product);
+
               return (
                 <ProductCard
                   key={product.productId}
                   product={product}
                   cartQty={quantityInCart}
                   onAdd={addToCart}
+                  disabled={selfSoldOut || normalLocked}
+                  disabledReason={
+                    selfSoldOut
+                      ? "재고가 부족합니다."
+                      : normalLocked
+                      ? "동일 상품의 프로모션 재고가 남아 있어 일반 상품은 선택할 수 없습니다."
+                      : ""
+                  }
                 />
               );
             })}
@@ -191,6 +246,7 @@ export default function App() {
           </button>
         </aside>
       </main>
+
       <PaymentModal
         open={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
@@ -198,6 +254,7 @@ export default function App() {
         options={paymentOptions}
         setOptions={setPaymentOptions}
         summary={paymentSummary}
+        promotionAvailable={hasPromotionItemInCart}
       />
     </div>
   );
