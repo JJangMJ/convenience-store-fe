@@ -3,8 +3,10 @@ import { money } from "../utils/money";
 export default function ReceiptModal({ open, onClose, receipt }) {
   if (!open || !receipt) return null;
 
-  const lineItems = receipt.lines ?? [];
+  const receiptLineItems = receipt.lines ?? [];
+  const receiptFreeItems = receipt.freeLines ?? [];
   const summary = receipt.summary ?? {};
+
   const formatReceiptRow = (productName, quantity, amount) => {
     const nameCell = String(productName ?? "")
       .slice(0, 12)
@@ -14,33 +16,49 @@ export default function ReceiptModal({ open, onClose, receipt }) {
     return `${nameCell}  ${quantityCell}   ${amountCell}`;
   };
 
-  const totalQuantity = lineItems.reduce(
-    (acc, item) => acc + (item.qty || 0),
+  const formatFreeRow = (productName, quantity) => {
+    const nameCell = String(productName ?? "")
+      .slice(0, 12)
+      .padEnd(12, " ");
+    const quantityCell = String(quantity ?? 0).padStart(2, " ");
+    return `${nameCell}  ${quantityCell}`;
+  };
+
+  const totalQuantity = receiptLineItems.reduce(
+    (accumulator, item) => accumulator + (item.qty || 0),
     0
   );
 
-  const receiptText = [
-    "===========W 편의점=============",
+  const receiptLines = [
+    "============W 편의점============",
     "상품명          수량      금액",
-    ...lineItems.map((item) =>
+    ...receiptLineItems.map((item) =>
       formatReceiptRow(item.name, item.qty, item.amount)
     ),
-    "==============================",
+  ];
+
+  if (receiptFreeItems.length > 0) {
+    receiptLines.push("============증    정============");
+    receiptLines.push(
+      ...receiptFreeItems.map((item) => formatFreeRow(item.name, item.qty))
+    );
+  }
+
+  receiptLines.push(
+    "===============================",
     `총구매액        ${String(totalQuantity).padStart(2, " ")}   ${money(
       summary.originalTotalAmount || 0
     ).padStart(10, " ")}`,
-    `행사할인                     -${money(
-      summary.promotionDiscountAmount || 0
-    )}`,
-    `멤버십할인                   -${money(
-      summary.membershipDiscountAmount || 0
-    )}`,
-    `결제금액                      ${money(summary.finalTotalAmount || 0)}`,
-  ].join("\n");
+    `행사할인                -${money(summary.promotionDiscountAmount || 0)}`,
+    `멤버십할인               -${money(summary.membershipDiscountAmount || 0)}`,
+    `결제금액                 ${money(summary.finalTotalAmount || 0)}`
+  );
+
+  const receiptText = receiptLines.join("\n");
 
   return (
     <div className="modal__backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
           <h3>영수증</h3>
         </div>

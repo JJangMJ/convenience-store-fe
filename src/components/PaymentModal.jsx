@@ -7,59 +7,126 @@ export default function PaymentModal({
   options,
   setOptions,
   summary,
-  promotionAvailable,
+  missingPromotion,
+  partialPromotion,
 }) {
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => (document.body.style.overflow = prev);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
-
-  useEffect(() => {
-    if (!promotionAvailable && options.takeFreeGift) {
-      setOptions((prev) => ({ ...prev, takeFreeGift: false }));
-    }
-  }, [promotionAvailable, options.takeFreeGift, setOptions]);
 
   if (!open) return null;
 
+  const handleSelectAddMore = (value) => {
+    setOptions((previousOptions) => ({
+      ...previousOptions,
+      acceptAddMore: value,
+    }));
+  };
+
+  const handleSelectNonPromotionPurchase = (value) => {
+    setOptions((previousOptions) => ({
+      ...previousOptions,
+      acceptNonPromoPurchase: value,
+    }));
+  };
+
   return (
     <div className="modal__backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
           <h3>결제 옵션 선택</h3>
         </div>
 
         <div className="modal__body">
-          <label className="switch-row">
-            <input
-              type="checkbox"
-              checked={options.applyMembership}
-              onChange={(e) =>
-                setOptions((prev) => ({
-                  ...prev,
-                  applyMembership: e.target.checked,
-                }))
-              }
-            />
-            <span>멤버십 할인 적용</span>
-          </label>
+          {missingPromotion && (
+            <div className="notice-box">
+              <p>
+                현재 <b>{missingPromotion.productName}</b>은(는){" "}
+                <b>{missingPromotion.extraQty}</b>개를 무료로 더 받을 수
+                있습니다. 추가하시겠습니까?
+              </p>
+              <div className="notice-box__buttons">
+                <button
+                  type="button"
+                  className={
+                    options.acceptAddMore === true
+                      ? "btn btn-small btn-fill"
+                      : "btn btn-small btn-ghost"
+                  }
+                  onClick={() => handleSelectAddMore(true)}
+                >
+                  예
+                </button>
+                <button
+                  type="button"
+                  className={
+                    options.acceptAddMore === false
+                      ? "btn btn-small btn-fill"
+                      : "btn btn-small btn-ghost"
+                  }
+                  onClick={() => handleSelectAddMore(false)}
+                >
+                  아니오
+                </button>
+              </div>
+            </div>
+          )}
 
-          <label className="switch-row" title={!promotionAvailable ? "장바구니에 프로모션 상품이 있을 때만 사용 가능합니다." : undefined}>
-            <input
-              type="checkbox"
-              disabled={!promotionAvailable}
-              checked={options.takeFreeGift}
-              onChange={(e) =>
-                setOptions((prev) => ({
-                  ...prev,
-                  takeFreeGift: e.target.checked,
-                }))
-              }
-            />
-            <span>프로모션 무료 증정 받기</span>
-          </label>
+          {partialPromotion && (
+            <div className="notice-box">
+              <p>
+                현재 <b>{partialPromotion.productName}</b>{" "}
+                <b>{partialPromotion.nonPromoQty}</b>개는 프로모션 할인이
+                적용되지 않습니다. 그래도 구매하시겠습니까?
+              </p>
+              <div className="notice-box__buttons">
+                <button
+                  type="button"
+                  className={
+                    options.acceptNonPromoPurchase === true
+                      ? "btn btn-small btn-fill"
+                      : "btn btn-small btn-ghost"
+                  }
+                  onClick={() => handleSelectNonPromotionPurchase(true)}
+                >
+                  예
+                </button>
+                <button
+                  type="button"
+                  className={
+                    options.acceptNonPromoPurchase === false
+                      ? "btn btn-small btn-fill"
+                      : "btn btn-small btn-ghost"
+                  }
+                  onClick={() => handleSelectNonPromotionPurchase(false)}
+                >
+                  아니오
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="membership-box">
+            <label className="switch-row">
+              <input
+                type="checkbox"
+                checked={options.applyMembership}
+                onChange={(event) =>
+                  setOptions((previousOptions) => ({
+                    ...previousOptions,
+                    applyMembership: event.target.checked,
+                  }))
+                }
+              />
+              <span>멤버십 할인 적용</span>
+            </label>
+            <p className="membership-box__desc"></p>
+          </div>
 
           {summary && (
             <div className="modal__summary">
