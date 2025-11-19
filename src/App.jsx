@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import PageHeader from "./components/PageHeader";
 import ProductPanel from "./components/ProductPanel";
 import CartPanel from "./components/CartPanel";
@@ -133,24 +133,26 @@ export default function App() {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      setIsLoadingProducts(true);
-      try {
-        const response = await fetch("/api/products");
-        const json = await response.json();
-        const productListFromResponse = Array.isArray(json.result)
-          ? json.result
-          : json.result?.data ?? [];
-        setProductList(productListFromResponse);
-      } catch (error) {
-        console.error(error);
-        alert("상품을 불러오지 못했습니다.");
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    })();
+  const loadProducts = useCallback(async () => {
+    setIsLoadingProducts(true);
+    try {
+      const response = await fetch("/api/products");
+      const json = await response.json();
+      const productListFromResponse = Array.isArray(json.result)
+        ? json.result
+        : json.result?.data ?? [];
+      setProductList(productListFromResponse);
+    } catch (error) {
+      console.error(error);
+      alert("상품을 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingProducts(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const addToCart = (productToAdd) => {
     setCartItemsByProductId((previousCartItemsByProductId) => {
@@ -338,6 +340,7 @@ export default function App() {
       });
       setIsReceiptOpen(true);
       setCartItemsByProductId({});
+      await loadProducts();
     } catch (error) {
       console.error(error);
       alert(error.message || "결제에 실패했습니다.");
