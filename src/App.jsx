@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import ProductCard from "./components/ProductCard";
-import CartRow from "./components/CartRow";
+import PageHeader from "./components/PageHeader";
+import ProductPanel from "./components/ProductPanel";
+import CartPanel from "./components/CartPanel";
 import PaymentModal from "./components/PaymentModal";
 import ReceiptModal from "./components/ReceiptModal";
 import { money } from "./utils/money";
@@ -21,6 +22,102 @@ const getPromotionConfig = (promotion) => {
     promotion?.free ??
     1;
   return { buyQuantity, freeQuantity };
+};
+
+const findMissingPromotion = (cartItems, cartItemsByProductId, productById) => {
+  const getRemainingStockForCart = (product) =>
+    (product.stock ?? 0) -
+    (cartItemsByProductId[product.productId]?.quantity ?? 0);
+
+  for (const cartItem of cartItems) {
+    const product = productById.get(cartItem.productId);
+    if (!product) continue;
+
+    const promotion = product.promotionSearchResponse;
+    if (!promotion) continue;
+
+    const { buyQuantity, freeQuantity } = getPromotionConfig(promotion);
+    if (!buyQuantity || !freeQuantity) continue;
+
+    const groupSize = buyQuantity + freeQuantity;
+    const quantityInCart = cartItem.quantity;
+
+    if (quantityInCart < buyQuantity) continue;
+
+    const remainder = quantityInCart % groupSize;
+    if (remainder === 0) continue;
+
+    const additionalQuantityNeeded = groupSize - remainder;
+    if (additionalQuantityNeeded > freeQuantity) continue;
+
+    const remainingStock = getRemainingStockForCart(product);
+    if (remainingStock < additionalQuantityNeeded) continue;
+
+    return {
+      productName: product.name,
+      extraQty: additionalQuantityNeeded,
+    };
+  }
+
+  return null;
+};
+
+const findPartialPromotion = (cartItems, productById) => {
+  for (const cartItem of cartItems) {
+    const product = productById.get(cartItem.productId);
+    if (!product) continue;
+
+    const promotion = product.promotionSearchResponse;
+    if (!promotion) continue;
+
+    const { buyQuantity, freeQuantity } = getPromotionConfig(promotion);
+    if (!buyQuantity || !freeQuantity) continue;
+
+    const groupSize = buyQuantity + freeQuantity;
+    const promotionStock = product.stock ?? 0;
+    const quantityInCart = cartItem.quantity;
+
+    if (quantityInCart < buyQuantity) continue;
+
+    const remainder = quantityInCart % groupSize;
+    if (remainder === 0) continue;
+
+    const additionalNeededForFullPromotion = groupSize - remainder;
+    const requiredPromotionStockForFullPromotion =
+      quantityInCart + additionalNeededForFullPromotion;
+
+    if (promotionStock < requiredPromotionStockForFullPromotion) {
+      return {
+        productName: product.name,
+        nonPromoQty: remainder,
+      };
+    }
+  }
+
+  return null;
+};
+
+const buildFreeItemsForReceipt = (finalCartItems, productById) => {
+  return finalCartItems
+    .map((cartItem) => {
+      const product = productById.get(cartItem.productId);
+      const promotion = product?.promotionSearchResponse;
+      if (!promotion) return null;
+
+      const { buyQuantity, freeQuantity } = getPromotionConfig(promotion);
+      if (!buyQuantity || !freeQuantity) return null;
+
+      const groupSize = buyQuantity + freeQuantity;
+      const groupCount = Math.floor(cartItem.quantity / groupSize);
+      const freeItemCount = groupCount * freeQuantity;
+      if (freeItemCount <= 0) return null;
+
+      return {
+        name: cartItem.name,
+        qty: freeItemCount,
+      };
+    })
+    .filter(Boolean);
 };
 
 export default function App() {
@@ -74,7 +171,8 @@ export default function App() {
         )?.quantity ?? 0;
 
       const product = productList.find(
-        (product) => product.productId === productToAdd.productId
+        (candidateProduct) =>
+          candidateProduct.productId === productToAdd.productId
       );
       const remainingStock = (product?.stock ?? 0) - alreadyInCartQuantity;
       if (remainingStock <= 0) return previousCartItemsByProductId;
@@ -92,7 +190,7 @@ export default function App() {
       if (!cartRow) return previousCartItemsByProductId;
 
       const product = productList.find(
-        (product) => product.productId === productId
+        (candidateProduct) => candidateProduct.productId === productId
       );
       const remainingStock = (product?.stock ?? 0) - cartRow.quantity;
       if (remainingStock <= 0) return previousCartItemsByProductId;
@@ -153,24 +251,6 @@ export default function App() {
     return productsByNameMap;
   }, [productList]);
 
-  const getQuantityInCart = (productId) =>
-    cartItemsByProductId[productId]?.quantity ?? 0;
-
-  const getRemainingStock = (product) =>
-    (product.stock ?? 0) - getQuantityInCart(product.productId);
-
-  const isNormalProductLocked = (product) => {
-    if (product.promotionSearchResponse) return false;
-
-    const productsWithSameName = productsByName.get(product.name) ?? [];
-    const promotionProduct = productsWithSameName.find(
-      (candidateProduct) => !!candidateProduct.promotionSearchResponse
-    );
-    if (!promotionProduct) return false;
-
-    return getRemainingStock(promotionProduct) > 0;
-  };
-
   const productById = useMemo(
     () => new Map(productList.map((product) => [product.productId, product])),
     [productList]
@@ -184,78 +264,15 @@ export default function App() {
     }));
   }, [cartItems]);
 
-  const missingPromotion = useMemo(() => {
-    const getRemainingStockForCart = (product) =>
-      (product.stock ?? 0) -
-      (cartItemsByProductId[product.productId]?.quantity ?? 0);
+  const missingPromotion = useMemo(
+    () => findMissingPromotion(cartItems, cartItemsByProductId, productById),
+    [cartItems, cartItemsByProductId, productById]
+  );
 
-    for (const cartItem of cartItems) {
-      const product = productById.get(cartItem.productId);
-      if (!product) continue;
-
-      const promotion = product.promotionSearchResponse;
-      if (!promotion) continue;
-
-      const { buyQuantity, freeQuantity } = getPromotionConfig(promotion);
-      if (!buyQuantity || !freeQuantity) continue;
-
-      const groupSize = buyQuantity + freeQuantity;
-      const quantityInCart = cartItem.quantity;
-
-      if (quantityInCart < buyQuantity) continue;
-
-      const remainder = quantityInCart % groupSize;
-      if (remainder === 0) continue;
-
-      const additionalQuantityNeeded = groupSize - remainder;
-      if (additionalQuantityNeeded > freeQuantity) continue;
-
-      const remainingStock = getRemainingStockForCart(product);
-      if (remainingStock < additionalQuantityNeeded) continue;
-
-      return {
-        productName: product.name,
-        extraQty: additionalQuantityNeeded,
-      };
-    }
-
-    return null;
-  }, [cartItems, cartItemsByProductId, productById]);
-
-  const partialPromotion = useMemo(() => {
-    for (const cartItem of cartItems) {
-      const product = productById.get(cartItem.productId);
-      if (!product) continue;
-
-      const promotion = product.promotionSearchResponse;
-      if (!promotion) continue;
-
-      const { buyQuantity, freeQuantity } = getPromotionConfig(promotion);
-      if (!buyQuantity || !freeQuantity) continue;
-
-      const groupSize = buyQuantity + freeQuantity;
-      const promotionStock = product.stock ?? 0;
-      const quantityInCart = cartItem.quantity;
-
-      if (quantityInCart < buyQuantity) continue;
-
-      const remainder = quantityInCart % groupSize;
-      if (remainder === 0) continue;
-
-      const additionalNeededForFullPromotion = groupSize - remainder;
-      const requiredPromotionStockForFullPromotion =
-        quantityInCart + additionalNeededForFullPromotion;
-
-      if (promotionStock < requiredPromotionStockForFullPromotion) {
-        return {
-          productName: product.name,
-          nonPromoQty: remainder,
-        };
-      }
-    }
-
-    return null;
-  }, [cartItems, productById]);
+  const partialPromotion = useMemo(
+    () => findPartialPromotion(cartItems, productById),
+    [cartItems, productById]
+  );
 
   const handleConfirmPayment = async () => {
     if (partialPromotion && paymentOptions.acceptNonPromoPurchase == null) {
@@ -272,7 +289,6 @@ export default function App() {
     }
 
     try {
-      const originalCartItems = cartItems;
       let finalCartItems = cartItems;
 
       if (missingPromotion && paymentOptions.acceptAddMore === true) {
@@ -287,33 +303,17 @@ export default function App() {
         });
       }
 
-      const freeLines = finalCartItems
-        .map((cartItem) => {
-          const product = productById.get(cartItem.productId);
-          const promotion = product?.promotionSearchResponse;
-          if (!promotion) return null;
-
-          const { buyQuantity, freeQuantity } = getPromotionConfig(promotion);
-          if (!buyQuantity || !freeQuantity) return null;
-
-          const groupSize = buyQuantity + freeQuantity;
-          const groupCount = Math.floor(cartItem.quantity / groupSize);
-          const freeCount = groupCount * freeQuantity;
-          if (freeCount <= 0) return null;
-
-          return {
-            name: cartItem.name,
-            qty: freeCount,
-          };
-        })
-        .filter(Boolean);
+      const freeReceiptItems = buildFreeItemsForReceipt(
+        finalCartItems,
+        productById
+      );
 
       const orderItems = finalCartItems.map((cartItem) => ({
         productId: cartItem.productId,
         quantity: cartItem.quantity,
       }));
 
-      const purchasedLines = finalCartItems.map((cartItem) => ({
+      const purchasedReceiptItems = finalCartItems.map((cartItem) => ({
         name: cartItem.name,
         qty: cartItem.quantity,
         unit: cartItem.price,
@@ -331,7 +331,11 @@ export default function App() {
       const result = response?.result ?? response;
 
       setIsPaymentModalOpen(false);
-      setReceipt({ lines: purchasedLines, freeLines, summary: result });
+      setReceipt({
+        lines: purchasedReceiptItems,
+        freeLines: freeReceiptItems,
+        summary: result,
+      });
       setIsReceiptOpen(true);
       setCartItemsByProductId({});
     } catch (error) {
@@ -342,67 +346,26 @@ export default function App() {
 
   return (
     <div className="page">
-      <header className="page__header">
-        <div className="brand">W 편의점</div>
-      </header>
+      <PageHeader />
 
       <main className="layout">
-        <section className="panel">
-          <h3 className="panel__title">상품</h3>
-          {isLoadingProducts && <div className="empty">로딩 중…</div>}
-          <div className="grid">
-            {productList.map((product) => {
-              const quantityInCart =
-                cartItemsByProductId[product.productId]?.quantity ?? 0;
-              const selfSoldOut = getRemainingStock(product) <= 0;
-              const normalProductLocked = isNormalProductLocked(product);
-              return (
-                <ProductCard
-                  key={product.productId}
-                  product={product}
-                  cartQty={quantityInCart}
-                  onAdd={addToCart}
-                  disabled={selfSoldOut || normalProductLocked}
-                  disabledReason={
-                    selfSoldOut
-                      ? "재고가 부족합니다."
-                      : normalProductLocked
-                      ? "동일 상품의 프로모션 재고가 남아 있어 일반 상품은 선택할 수 없습니다."
-                      : ""
-                  }
-                />
-              );
-            })}
-          </div>
-        </section>
+        <ProductPanel
+          productList={productList}
+          cartItemsByProductId={cartItemsByProductId}
+          productsByName={productsByName}
+          isLoadingProducts={isLoadingProducts}
+          onAddToCart={addToCart}
+        />
 
-        <aside className="panel cart">
-          <h3 className="panel__title">장바구니</h3>
-          <div className="cart__rows">
-            {cartItems.map((cartItem) => (
-              <CartRow
-                key={cartItem.productId}
-                item={cartItem}
-                onInc={increaseCartItemQuantity}
-                onDec={decreaseCartItemQuantity}
-                onRemove={removeCartItem}
-              />
-            ))}
-          </div>
-          <div className="cart__summary">
-            <div>총 수량</div>
-            <div>{totalQuantity}</div>
-            <div>상품 금액</div>
-            <div>{money(subtotalAmount)}</div>
-          </div>
-          <button
-            className="btn btn-fill cart__pay"
-            disabled={cartItems.length === 0}
-            onClick={() => setIsPaymentModalOpen(true)}
-          >
-            결제하기
-          </button>
-        </aside>
+        <CartPanel
+          cartItems={cartItems}
+          totalQuantity={totalQuantity}
+          subtotalAmount={subtotalAmount}
+          onIncreaseQuantity={increaseCartItemQuantity}
+          onDecreaseQuantity={decreaseCartItemQuantity}
+          onRemoveItem={removeCartItem}
+          onClickPay={() => setIsPaymentModalOpen(true)}
+        />
       </main>
 
       <PaymentModal
