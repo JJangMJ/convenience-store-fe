@@ -21,11 +21,22 @@ export default function PaymentModal({
 
   if (!open) return null;
 
-  const handleSelectAddMore = (value) => {
+  const hasMissingPromotion =
+    Array.isArray(missingPromotion) && missingPromotion.length > 0;
+
+  const handleSelectAddMore = (productId, value) => {
     setOptions((previousOptions) => ({
       ...previousOptions,
-      acceptAddMore: value,
+      acceptAddMore: {
+        ...(previousOptions.acceptAddMore || {}),
+        [productId]: value,
+      },
     }));
+  };
+
+  const isAddMoreSelected = (productId, expectedValue) => {
+    const map = options.acceptAddMore || {};
+    return map[productId] === expectedValue;
   };
 
   const handleSelectNonPromotionPurchase = (value) => {
@@ -43,37 +54,43 @@ export default function PaymentModal({
         </div>
 
         <div className="modal__body">
-          {missingPromotion && (
+          {hasMissingPromotion && (
             <div className="notice-box">
-              <p>
-                현재 <b>{missingPromotion.productName}</b>은(는){" "}
-                <b>{missingPromotion.extraQty}</b>개를 무료로 더 받을 수
-                있습니다. 추가하시겠습니까?
-              </p>
-              <div className="notice-box__buttons">
-                <button
-                  type="button"
-                  className={
-                    options.acceptAddMore === true
-                      ? "btn btn-small btn-fill"
-                      : "btn btn-small btn-ghost"
-                  }
-                  onClick={() => handleSelectAddMore(true)}
-                >
-                  예
-                </button>
-                <button
-                  type="button"
-                  className={
-                    options.acceptAddMore === false
-                      ? "btn btn-small btn-fill"
-                      : "btn btn-small btn-ghost"
-                  }
-                  onClick={() => handleSelectAddMore(false)}
-                >
-                  아니오
-                </button>
-              </div>
+              {missingPromotion.map((offer) => (
+                <div key={offer.productId} className="notice-box__item">
+                  <p>
+                    현재 <b>{offer.productName}</b>은(는){" "}
+                    <b>{offer.extraQty}</b>개를 무료로 더 받을 수 있습니다.
+                    추가하시겠습니까?
+                  </p>
+                  <div className="notice-box__buttons">
+                    <button
+                      type="button"
+                      className={
+                        isAddMoreSelected(offer.productId, true)
+                          ? "btn btn-small btn-fill"
+                          : "btn btn-small btn-ghost"
+                      }
+                      onClick={() => handleSelectAddMore(offer.productId, true)}
+                    >
+                      예
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        isAddMoreSelected(offer.productId, false)
+                          ? "btn btn-small btn-fill"
+                          : "btn btn-small btn-ghost"
+                      }
+                      onClick={() =>
+                        handleSelectAddMore(offer.productId, false)
+                      }
+                    >
+                      아니오
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

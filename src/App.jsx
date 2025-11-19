@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 import PageHeader from "./components/PageHeader";
 import ProductPanel from "./components/ProductPanel";
@@ -24,10 +25,16 @@ const getPromotionConfig = (promotion) => {
   return { buyQuantity, freeQuantity };
 };
 
-const findMissingPromotion = (cartItems, cartItemsByProductId, productById) => {
+const findMissingPromotions = (
+  cartItems,
+  cartItemsByProductId,
+  productById
+) => {
   const getRemainingStockForCart = (product) =>
     (product.stock ?? 0) -
     (cartItemsByProductId[product.productId]?.quantity ?? 0);
+
+  const offers = [];
 
   for (const cartItem of cartItems) {
     const product = productById.get(cartItem.productId);
@@ -53,13 +60,14 @@ const findMissingPromotion = (cartItems, cartItemsByProductId, productById) => {
     const remainingStock = getRemainingStockForCart(product);
     if (remainingStock < additionalQuantityNeeded) continue;
 
-    return {
+    offers.push({
+      productId: product.productId,
       productName: product.name,
       extraQty: additionalQuantityNeeded,
-    };
+    });
   }
 
-  return null;
+  return offers;
 };
 
 const findPartialPromotion = (cartItems, productById) => {
@@ -127,7 +135,7 @@ export default function App() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentOptions, setPaymentOptions] = useState({
     applyMembership: false,
-    acceptAddMore: null,
+    acceptAddMore: {},
     acceptNonPromoPurchase: null,
   });
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
@@ -261,13 +269,13 @@ export default function App() {
   useEffect(() => {
     setPaymentOptions((previousPaymentOptions) => ({
       ...previousPaymentOptions,
-      acceptAddMore: null,
+      acceptAddMore: {},
       acceptNonPromoPurchase: null,
     }));
   }, [cartItems]);
 
-  const missingPromotion = useMemo(
-    () => findMissingPromotion(cartItems, cartItemsByProductId, productById),
+  const missingPromotionOffers = useMemo(
+    () => findMissingPromotions(cartItems, cartItemsByProductId, productById),
     [cartItems, cartItemsByProductId, productById]
   );
 
@@ -293,14 +301,23 @@ export default function App() {
     try {
       let finalCartItems = cartItems;
 
-      if (missingPromotion && paymentOptions.acceptAddMore === true) {
+      const hasMissingPromotionOffers =
+        Array.isArray(missingPromotionOffers) &&
+        missingPromotionOffers.length > 0;
+
+      if (hasMissingPromotionOffers) {
         finalCartItems = cartItems.map((cartItem) => {
-          if (cartItem.name !== missingPromotion.productName) {
-            return cartItem;
-          }
+          const offer = missingPromotionOffers.find(
+            (item) => item.productId === cartItem.productId
+          );
+          if (!offer) return cartItem;
+
+          const decision = paymentOptions.acceptAddMore?.[offer.productId];
+          if (decision !== true) return cartItem;
+
           return {
             ...cartItem,
-            quantity: cartItem.quantity + (missingPromotion.extraQty || 0),
+            quantity: cartItem.quantity + (offer.extraQty || 0),
           };
         });
       }
@@ -325,7 +342,7 @@ export default function App() {
       const response = await createOrder({
         orderItems,
         applyMembership: paymentOptions.applyMembership,
-        takePromotionFreeGift: paymentOptions.acceptAddMore === true,
+        takePromotionFreeGift: true,
         acceptNonPromotionPurchase:
           paymentOptions.acceptNonPromoPurchase === true,
       });
@@ -378,7 +395,7 @@ export default function App() {
         options={paymentOptions}
         setOptions={setPaymentOptions}
         summary={paymentSummary}
-        missingPromotion={missingPromotion}
+        missingPromotion={missingPromotionOffers}
         partialPromotion={partialPromotion}
       />
 
